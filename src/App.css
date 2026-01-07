@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* Suas customizações para o clima de Wychwood */
+@theme {
+  --color-rpg-dark: #0b0f1a;
+  --color-rpg-accent: #8b5cf6;
+}
+
+.glass-panel {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Névoa baixa que envolve os jogadores [cite: 2] */
+.fog-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 70%);
+  animation: fog-drift 10s ease-in-out infinite;
+  z-index: 10;
+}
+
+@keyframes fog-drift {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.05); }
+}
