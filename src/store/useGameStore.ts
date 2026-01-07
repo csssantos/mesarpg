@@ -1,6 +1,8 @@
+// src/store/useGameStore.ts
 import { create } from 'zustand';
 import { db } from '../firebaseConfig';
-import { ref, onValue, set, update } from 'firebase/database';
+// CORREÇÃO 1: Renomeamos 'set' para 'firebaseSet' na importação
+import { ref, onValue, set as firebaseSet, update } from 'firebase/database';
 
 export type PlayerStatus = 'alive' | 'dead' | 'insane' | 'unknown';
 
@@ -75,7 +77,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     onValue(gameRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        // Atualiza apenas o que veio do banco, mantendo o que é sessão local (como activeSessionPlayerId)
+        // 'set' aqui é do Zustand (Local) - ESTÁ CORRETO
         set((state) => ({
           ...state,
           players: data.players || state.players,
@@ -85,8 +87,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           mapPosition: data.mapPosition ?? state.mapPosition
         }));
       } else {
-        // Se o banco estiver vazio (primeira vez), salva o estado inicial lá
-        set(ref(db, 'game-session-01'), {
+        // CORREÇÃO 2: Usamos 'firebaseSet' para salvar no banco e evitar o erro
+        firebaseSet(ref(db, 'game-session-01'), {
           players: get().players,
           isPlotTwistActive: false,
           discoveredClues: [],
@@ -100,13 +102,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   // --- ACTIONS REMOTAS (ESCRITA) ---
   
   updatePosition: (id, x, y) => {
-    // 1. Atualiza Localmente (Otimista) para não travar a UI
+    // 1. Atualiza Localmente (Otimista)
     const newPlayers = get().players.map((p) => (p.id === id ? { ...p, x, y } : p));
     set({ players: newPlayers });
 
     // 2. Envia para o Firebase
-    // Nota: Estamos salvando o array inteiro de players para simplificar. 
-    // Num app grande, atualizaríamos apenas `players/index/x`.
     update(ref(db, 'game-session-01'), { players: newPlayers });
   },
 
