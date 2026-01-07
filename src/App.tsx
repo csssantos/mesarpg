@@ -8,13 +8,15 @@ import { CharacterSelectionPage } from './components/CharacterSelectionPage';
 import "./App.css";
 
 function App() {
-  const isPlotTwistActive = useGameStore((state) => state.isPlotTwistActive);
-  // Pegamos o ID do jogador atual para saber se o jogo começou
+const isPlotTwistActive = useGameStore((state) => state.isPlotTwistActive);
   const activeSessionPlayerId = useGameStore((state) => state.activeSessionPlayerId);
+  const connectToDB = useGameStore((state) => state.connectToDB); // <--- Pegue a ação
 
-  // --- LÓGICA DE RENDERIZAÇÃO CONDICIONAL ---
-  
-  // Se não tem jogador selecionado, mostra a tela de início
+  // --- CONECTAR AO FIREBASE AO ABRIR ---
+  useEffect(() => {
+    connectToDB();
+  }, []);
+
   if (!activeSessionPlayerId) {
     return <CharacterSelectionPage />;
   }
