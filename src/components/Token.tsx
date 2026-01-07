@@ -10,41 +10,49 @@ export const Token = ({ player }: TokenProps) => {
   // Estado Global
   const updatePosition = useGameStore((state) => state.updatePosition);
   const activeSessionPlayerId = useGameStore((state) => state.activeSessionPlayerId);
-  const mapScale = useGameStore((state) => state.mapScale); // <--- Precisamos do Scale para corrigir o movimento
+  const mapScale = useGameStore((state) => state.mapScale);
   
   // Controle GM
   const isGM = useGameStore((state) => state.isGM);
   const gmTool = useGameStore((state) => state.gmTool);
 
   const isMe = player.id === activeSessionPlayerId;
+  
+  // Permissão de Arraste
   const canDrag = isGM && gmTool === 'select';
 
-  // --- LÓGICA DE MOVIMENTO MANUAL (Correção do Zoom) ---
-  // Usamos MotionValues para performance (não re-renderiza o React a cada pixel)
+  // Motion Values (Coordenadas visuais)
   const x = useMotionValue(player.x);
   const y = useMotionValue(player.y);
   
   const [isDragging, setIsDragging] = useState(false);
-  const lastMousePos = useRef({ x: 0, y: 0 });
+  
+  // Refs para guardar a posição inicial EXATA do clique
+  const dragStartPos = useRef({ x: 0, y: 0 }); // Onde o mouse clicou (tela)
+  const tokenStartPos = useRef({ x: 0, y: 0 }); // Onde o token estava (mapa)
 
-  // Sincroniza posição se o servidor/outro player atualizar (e se não estiver arrastando)
+  // Sincroniza posição com o banco de dados (se não estiver arrastando)
   useEffect(() => {
     if (!isDragging) {
       x.set(player.x);
       y.set(player.y);
     }
-  }, [player.x, player.y, isDragging]);
+  }, [player.x, player.y, isDragging, x, y]);
+
+  // --- HANDLERS DE ARRASTE ---
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!canDrag) return;
     
-    e.stopPropagation(); // Impede que o Mapa se mova
-    e.preventDefault();  // Impede seleção de texto/imagem
+    e.stopPropagation();
+    e.preventDefault();
     
     setIsDragging(true);
-    lastMousePos.current = { x: e.clientX, y: e.clientY };
     
-    // Trava o ponteiro no elemento (opcional, mas ajuda em navegadores modernos)
+    // Salva o ponto de ancoragem inicial
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    tokenStartPos.current = { x: x.get(), y: y.get() };
+    
     (e.target as Element).setPointerCapture(e.pointerId);
   };
 
@@ -52,16 +60,14 @@ export const Token = ({ player }: TokenProps) => {
     if (!isDragging) return;
     e.stopPropagation();
 
-    // CÁLCULO MÁGICO: Divide o movimento pelo Zoom (mapScale)
-    // Se o zoom é 2x, o movimento do mouse vale metade.
-    // Se o zoom é 0.5x, o movimento vale o dobro.
-    const deltaX = (e.clientX - lastMousePos.current.x) / mapScale;
-    const deltaY = (e.clientY - lastMousePos.current.y) / mapScale;
+    // CÁLCULO DE DESLOCAMENTO (OFFSET)
+    // Calcula quanto o mouse andou desde o clique inicial e divide pelo zoom
+    const deltaX = (e.clientX - dragStartPos.current.x) / mapScale;
+    const deltaY = (e.clientY - dragStartPos.current.y) / mapScale;
 
-    x.set(x.get() + deltaX);
-    y.set(y.get() + deltaY);
-
-    lastMousePos.current = { x: e.clientX, y: e.clientY };
+    // Aplica na posição original do token
+    x.set(tokenStartPos.current.x + deltaX);
+    y.set(tokenStartPos.current.y + deltaY);
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -71,23 +77,30 @@ export const Token = ({ player }: TokenProps) => {
     setIsDragging(false);
     (e.target as Element).releasePointerCapture(e.pointerId);
 
-    // Salva a posição final no estado global (Servidor)
+    // Salva no banco de dados
     updatePosition(player.id, x.get(), y.get());
   };
 
   return (
     <motion.div
-      // Removemos o 'drag' nativo do framer-motion pois ele buga com scale
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       
-      // Animação suave (Spring) apenas visualmente
-      style={{ x, y, touchAction: 'none' }} 
+      // CONFIGURAÇÃO CRÍTICA DO FRAMER MOTION
+      style={{ x, y, touchAction: 'none' }}
       
-      className={`absolute flex flex-col items-center z-50 transition-shadow ${
-        canDrag ? 'cursor-grab active:cursor-grabbing' : 'pointer-events-none'
-      } ${isDragging ? 'scale-110 z-[100]' : 'z-50'}`} // Aumenta um pouco ao arrastar
+      // Controlamos o Scale aqui para não brigar com o Translate
+      animate={{ 
+        scale: isDragging ? 1.2 : 1, // Aumenta ao arrastar
+        zIndex: isDragging ? 100 : 50 // Fica por cima de todos ao arrastar
+      }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      
+      // Adicionado 'left-0 top-0' para garantir a origem correta do translate
+      className={`absolute left-0 top-0 flex flex-col items-center cursor-grab active:cursor-grabbing ${
+        canDrag ? 'pointer-events-auto' : 'pointer-events-none'
+      }`}
     >
       {/* Indicador VOCÊ */}
       {isMe && (
@@ -102,7 +115,7 @@ export const Token = ({ player }: TokenProps) => {
       )}
 
       {/* Avatar do Pino */}
-      <div className={`relative w-14 h-14 rounded-full border-2 ${player.color} shadow-[0_0_15px_rgba(0,0,0,0.8)] overflow-hidden bg-slate-900 group select-none pointer-events-none`}>
+      <div className={`relative w-14 h-14 rounded-full border-2 ${player.color} shadow-[0_0_15px_rgba(0,0,0,0.8)] overflow-hidden bg-slate-900 group select-none`}>
         <img src={player.avatar} alt={player.name} className="w-full h-full object-cover" draggable={false} />
         {/* Efeito Hover interno */}
         <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors"></div>

@@ -1,3 +1,4 @@
+// src/components/MapBoard.tsx
 import { useState, useRef } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { Token } from './Token';
@@ -14,7 +15,7 @@ export const MapBoard = () => {
   const mapPosition = useGameStore((state) => state.mapPosition);
   const updateMapState = useGameStore((state) => state.updateMapState);
 
-  // Controle local APENAS para o arraste (delta), não para a posição final
+  // Controle local APENAS para o arraste (delta)
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
 
@@ -22,43 +23,32 @@ export const MapBoard = () => {
 
   // --- LÓGICA DE ZOOM (Só GM) ---
   const handleWheel = (e: React.WheelEvent) => {
-    // SE NÃO FOR GM, NÃO FAZ NADA (Bloqueia zoom do jogador)
     if (!isGM) return;
-
     e.stopPropagation();
     const zoomSensitivity = 0.001;
     const newScale = Math.min(Math.max(0.2, mapScale - e.deltaY * zoomSensitivity), 4);
-    
-    // Atualiza estado global
     updateMapState(newScale, mapPosition);
   };
 
   // --- LÓGICA DE INÍCIO DE ARRASTE ---
   const handleMouseDown = (e: React.MouseEvent) => {
-    // SÓ permite arrastar o mapa se for GM E estiver com a ferramenta de câmera
     const canDragMap = isGM && gmTool === 'camera';
-
     if (e.button === 0 && canDragMap) { 
       setIsDragging(true);
       setLastMousePos({ x: e.clientX, y: e.clientY });
     }
   };
 
-  // --- LÓGICA DE MOVIMENTO (Só funciona se isDragging for true, logo, só GM) ---
+  // --- LÓGICA DE MOVIMENTO ---
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-
     const deltaX = e.clientX - lastMousePos.x;
     const deltaY = e.clientY - lastMousePos.y;
-
     const newPosition = {
       x: mapPosition.x + deltaX,
       y: mapPosition.y + deltaY,
     };
-
     setLastMousePos({ x: e.clientX, y: e.clientY });
-    
-    // Atualiza estado global (Jogadores verão isso em tempo real)
     updateMapState(mapScale, newPosition);
   };
 
@@ -66,13 +56,11 @@ export const MapBoard = () => {
     setIsDragging(false);
   };
 
-  // Define o estilo do cursor
   const getCursorStyle = () => {
     if (isGM) {
       if (gmTool === 'camera') return isDragging ? 'cursor-grabbing' : 'cursor-grab';
       return 'cursor-default';
     }
-    // Jogador vê cursor normal (não pode interagir com mapa)
     return 'cursor-default'; 
   };
 
@@ -86,41 +74,43 @@ export const MapBoard = () => {
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* O Mundo (Controlado pelas variáveis globais mapPosition e mapScale) */}
+      {/* O Mundo (Container Transformável) */}
       <div 
         className="absolute w-full h-full flex justify-center items-center transform-gpu will-change-transform"
         style={{
-          // Usamos transition apenas se NÃO estiver arrastando, para ficar suave no broadcast, 
-          // mas responsivo para o GM que está arrastando
           transition: isDragging ? 'none' : 'transform 0.1s linear', 
           transform: `translate(${mapPosition.x}px, ${mapPosition.y}px) scale(${mapScale})`,
           transformOrigin: 'center center'
         }}
       >
+        {/* A Caixa do Mapa */}
         <div 
-          className="relative shadow-2xl shadow-black"
-          style={{ width: '2048px', height: '1536px' }}
+          // ADICIONADO: flex-none para impedir que telas pequenas esmaguem o mapa
+          className="relative shadow-2xl shadow-black flex-none"
+          style={{ width: '2500px', height: '1536px' }}
         >
-          {/* Fundo do Mapa */}
+          {/* Fundo do Mapa (Imagem) */}
           <div 
-            className="absolute inset-0 bg-no-repeat bg-cover bg-center rounded-lg"
+            // ALTERADO: Removemos 'bg-cover' e usamos style direto para garantir que não corte
+            className="absolute inset-0 bg-no-repeat bg-center rounded-lg"
             style={{ 
               backgroundImage: isPlotTwistActive 
                 ? "url('https://images.unsplash.com/photo-1519003722824-194d4455a60c?q=80&w=2075')" 
                 : `url(${mapa})`,
+              // MUDANÇA CRÍTICA: '100% 100%' força a imagem a caber na caixa inteira sem cortar nada
+              backgroundSize: '100% 100%', 
               filter: isPlotTwistActive ? 'none' : 'contrast(1.1) brightness(0.8) saturate(0.8)'
             }}
           />
 
-          {/* Tokens (Herdeiros do Zoom) */}
+          {/* Tokens */}
           {players.map((player) => (
             <Token key={player.id} player={player} />
           ))}
-
         </div>
       </div>
 
-      {/* HUD Zoom (Visível para todos, mas só muda se GM mudar) */}
+      {/* HUD Zoom */}
       <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-50 pointer-events-none">
         <div className="bg-black/60 backdrop-blur text-white text-xs px-2 py-1 rounded border border-white/10 pointer-events-auto shadow-lg">
           Cam: {Math.round(mapScale * 100)}%
