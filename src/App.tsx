@@ -1,5 +1,5 @@
 // src/App.tsx
-import { useEffect } from 'react'; // <--- ADICIONE ESTA IMPORTAÇÃO AQUI
+import { useEffect } from 'react'; // <--- ADICIONADO AQUI
 import { useGameStore } from './store/useGameStore';
 import { MapBoard } from './components/MapBoard';
 import { Sidebar } from './components/Sidebar';
@@ -13,7 +13,6 @@ function App() {
   const activeSessionPlayerId = useGameStore((state) => state.activeSessionPlayerId);
   const connectToDB = useGameStore((state) => state.connectToDB);
 
-  // Conectar ao Banco de Dados ao iniciar
   useEffect(() => {
     connectToDB();
   }, []);
