@@ -9,7 +9,8 @@ const firebaseConfig = {
   storageBucket: "mesarpg-2cba7.firebasestorage.app",
   messagingSenderId: "724445556544",
   appId: "1:724445556544:web:f982351b59cddd0f5a54a5",
-  measurementId: "G-Y5TNYH7WCW"
+  measurementId: "G-Y5TNYH7WCW",
+  databaseURL: "https://mesarpg-2cba7-default-rtdb.firebaseio.com/"
 };
 
 // Initialize Firebase
